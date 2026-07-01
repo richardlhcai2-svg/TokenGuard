@@ -97,25 +97,13 @@ class UsageRecordCreate(BaseModel):
     ended_at: Optional[datetime] = None
 
 
-class UsageRecordOut(BaseModel):
+class UsageRecordIn(UsageRecordCreate):
+    """Used by proxy — no `id` field."""
+    pass
+
+
+class UsageRecordOut(UsageRecordCreate):
     id: str
-    organization_id: str
-    user_id: str
-    tool_name: str
-    model_name: Optional[str] = None
-    provider: Optional[str] = None
-    input_tokens: int
-    output_tokens: int
-    cache_creation_tokens: int
-    cache_read_tokens: int
-    cost_usd: Decimal
-    session_id: Optional[str] = None
-    project_name: Optional[str] = None
-    task_type: Optional[str] = None
-    context_window_size: Optional[int] = None
-    context_usage_pct: Optional[Decimal] = None
-    started_at: datetime
-    ended_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 
