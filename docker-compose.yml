@@ -1,0 +1,79 @@
+version: "3.9"
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: tokenguard-db
+    environment:
+      POSTGRES_USER: tokenguard
+      POSTGRES_PASSWORD: tokenguard_dev
+      POSTGRES_DB: tokenguard
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: tokenguard-redis
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./tokenguard/backend
+    container_name: tokenguard-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://tokenguard:tokenguard_dev@db:5432/tokenguard
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: dev-secret-change-in-production
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./tokenguard/backend:/app
+
+  proxy:
+    build: ./tokenguard/proxy
+    container_name: tokenguard-proxy
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://tokenguard:tokenguard_dev@db:5432/tokenguard
+      REDIS_URL: redis://redis:6379/0
+      PROXY_HOST: 0.0.0.0
+      PROXY_PORT: 8001
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./tokenguard/proxy:/app
+
+  celery-worker:
+    build: ./tokenguard/backend
+    container_name: tokenguard-celery
+    environment:
+      DATABASE_URL: postgresql://tokenguard:tokenguard_dev@db:5432/tokenguard
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    command: celery -A app.celery_worker worker --loglevel=info
+
+  frontend:
+    build: ./tokenguard/frontend
+    container_name: tokenguard-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+    depends_on:
+      - backend
+    volumes:
+      - ./tokenguard/frontend:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:
+  redis-data:

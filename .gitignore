@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.env
+.env.local
+
+# Node
+node_modules/
+.next/
+out/
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+pgdata/
+redis-data/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
