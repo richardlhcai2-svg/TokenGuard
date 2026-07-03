@@ -1,3 +1,5 @@
+"""Provider-aware proxy dispatcher — routes requests to the correct handler."""
+
 import asyncio
 import json
 import logging
@@ -7,92 +9,61 @@ from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Request, Response, HTTPException
-from fastapi.responses import StreamingResponse
-
-from app.utils import (
-    estimate_input_tokens,
-    get_model_info,
-    should_trigger_warning,
-)
 
 logger = logging.getLogger("tokenguard.proxy")
 
 router = APIRouter()
 
-ANTHROPIC_API_URL = "https://api.anthropic.com"
 TG_KEY_HEADER = "x-tokenguard-key"
 
 
+try:
+    from tokenguard.storage import UsageStore
+    _local_store = UsageStore()
+except ImportError:
+    _local_store = None
+
+
 async def _save_usage_async(usage: dict, session_id: Optional[str]):
-    """Async fire-and-forget usage save to backend."""
-    try:
-        backend_url = os.getenv("BACKEND_URL", "http://backend:8000")
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.post(
-                f"{backend_url}/api/v1/usage",
-                json={**usage, "session_id": session_id},
-                headers={
-                    "Content-Type": "application/json",
-                    "x-tokenguard-key": os.getenv("PROXY_SECRET", ""),
-                },
-            )
-    except Exception:
-        logger.exception("Failed to save usage data")
-
-
-async def _extract_and_save_usage(
-    response_body: bytes,
-    request_body: dict,
-    model_info: dict,
-    start_time: float,
-):
-    """Extract usage stats from response and save to backend."""
-    try:
-        usage = _parse_usage_from_response(response_body, model_info)
-        if usage:
-            usage["duration_ms"] = int((time.time() - start_time) * 1000)
-            session_id = request_body.get("session_id")
-            await _save_usage_async(usage, session_id)
-    except Exception:
-        logger.exception("Failed to extract usage from response")
-
-
-def _parse_usage_from_response(
-    response_body: bytes, model_info: dict
-) -> Optional[dict]:
-    """Parse usage stats from Anthropic response body."""
-    try:
-        data = json.loads(response_body.decode("utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return None
-
-    usage = data.get("usage", {})
-    if not usage:
-        return None
-
-    context_window = model_info["context_window"]
-    input_tokens = usage.get("input_tokens", 0)
-    output_tokens = usage.get("output_tokens", 0)
-    cache_creation = usage.get("cache_creation_input_tokens", 0)
-    cache_read = usage.get("cache_read_input_tokens", 0)
-
-    total_input = input_tokens + cache_creation + cache_read
-    pct = (total_input + output_tokens) / context_window if context_window else 0
-
-    return {
-        "model_name": model_info["model_name"],
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens,
-        "cache_creation_tokens": cache_creation,
-        "cache_read_tokens": cache_read,
-        "context_usage_pct": round(pct, 4),
-        "context_warning": should_trigger_warning(pct),
+    """Async fire-and-forget usage save to backend with retry.
+    Falls back to local SQLite in standalone mode."""
+    backend_url = os.getenv("BACKEND_URL", "http://backend:8000")
+    proxy_secret = os.getenv("PROXY_SECRET", "")
+    headers = {
+        "Content-Type": "application/json",
+        "x-tokenguard-key": proxy_secret,
     }
+    payload = {**usage, "session_id": session_id}
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for attempt in range(3):
+            try:
+                resp = await client.post(
+                    f"{backend_url}/internal/usage",
+                    json=payload,
+                    headers=headers,
+                )
+                if resp.status_code == 200:
+                    return
+                logger.warning("Usage save returned %d on attempt %d", resp.status_code, attempt + 1)
+            except httpx.TimeoutException:
+                logger.warning("Usage save timeout on attempt %d", attempt + 1)
+            except Exception:
+                logger.warning("Usage save failed on attempt %d", attempt + 1)
+            if attempt < 2:
+                await asyncio.sleep(0.5 * (2 ** attempt))
+
+    # Fallback to local SQLite when backend is unreachable
+    if _local_store is not None:
+        try:
+            _local_store.save_usage(payload)
+            logger.info("Saved usage to local SQLite (fallback)")
+        except Exception as e:
+            logger.error("Failed to save to local SQLite: %s", e)
 
 
-@router.post("/{path:path}")
-async def proxy_request(request: Request, path: str):
-    """Core transparent proxy handler — forwards to Anthropic API."""
+def _validate_tokenguard_key(request: Request) -> dict:
+    """Extract and validate the x-tokenguard-key header. Returns request headers dict."""
     tg_key = request.headers.get(TG_KEY_HEADER)
     if not tg_key:
         raise HTTPException(status_code=401, detail="Missing x-tokenguard-key header")
@@ -101,71 +72,48 @@ async def proxy_request(request: Request, path: str):
     if tg_key != proxy_secret:
         raise HTTPException(status_code=403, detail="Invalid proxy key")
 
-    body_bytes = await request.body()
-    try:
-        body = json.loads(body_bytes)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
-
-    upstream_url = f"{ANTHROPIC_API_URL}/{path}"
+    # Build headers dict, strip the internal auth header
     headers = dict(request.headers)
     headers.pop(TG_KEY_HEADER, None)
-    headers.pop("host", None)
+    return headers
 
-    model_name = body.get("model", "unknown")
-    model_info = get_model_info(model_name)
+
+@router.post("/{path:path}")
+async def proxy_request(request: Request, path: str):
+    """Route requests to the correct provider handler based on URL path prefix.
+
+    Provider prefixes:
+      /anthropic/v1/messages  → Anthropic handler
+      /openai/v1/chat/completions  → OpenAI handler
+      /gemini/v1beta/models/...  → Gemini handler
+      /deepseek/v1/chat/completions  → DeepSeek handler (OpenAI-compatible)
+
+    Legacy: no prefix → defaults to Anthropic (backward compatible).
+    """
+    headers = _validate_tokenguard_key(request)
+    body_bytes = await request.body()
     start_time = time.time()
-    is_streaming = body.get("stream", False)
 
-    async with httpx.AsyncClient(timeout=300.0) as client:
-        async with client.stream(
-            "POST",
-            upstream_url,
-            headers=headers,
-            content=body_bytes,
-        ) as response:
-            response_headers = dict(response.headers)
+    # Dispatch by the first path segment
+    first_segment = path.split("/")[0] if path else ""
 
-            if is_streaming:
-                chunks: list[bytes] = []
-                usage_found = False
+    if first_segment == "anthropic":
+        from app.handlers.anthropic import handle
+        return await handle(request, path.removeprefix("anthropic/"), body_bytes, headers, start_time)
 
-                async def chunk_generator():
-                    nonlocal usage_found
-                    async for chunk in response.aiter_bytes():
-                        chunks.append(chunk)
-                        yield chunk
-                        if not usage_found and b'"usage"' in chunk:
-                            usage_found = True
+    elif first_segment == "openai":
+        from app.handlers.openai import handle
+        return await handle(request, path.removeprefix("openai/"), body_bytes, headers, start_time, provider="openai")
 
-                async def save_after_stream():
-                    full_body = b"".join(chunks)
-                    if full_body:
-                        await _extract_and_save_usage(
-                            full_body, body, model_info, start_time
-                        )
+    elif first_segment == "gemini":
+        from app.handlers.gemini import handle
+        return await handle(request, path.removeprefix("gemini/"), body_bytes, headers, start_time)
 
-                asyncio.create_task(save_after_stream())
+    elif first_segment == "deepseek":
+        from app.handlers.openai import handle
+        return await handle(request, path.removeprefix("deepseek/"), body_bytes, headers, start_time, provider="deepseek")
 
-                return StreamingResponse(
-                    chunk_generator(),
-                    status_code=response.status_code,
-                    headers=response_headers,
-                    media_type=response.headers.get(
-                        "content-type", "text/event-stream"
-                    ),
-                )
-            else:
-                response_body = await response.aread()
-
-                asyncio.create_task(
-                    _extract_and_save_usage(
-                        response_body, body, model_info, start_time
-                    )
-                )
-
-                return Response(
-                    content=response_body.decode("utf-8"),
-                    status_code=response.status_code,
-                    headers=response_headers,
-                )
+    else:
+        # Legacy: no provider prefix → assume Anthropic
+        from app.handlers.anthropic import handle
+        return await handle(request, path, body_bytes, headers, start_time)
