@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     project_name: str = "TokenGuard"
     version: str = "0.1.0"
     database_url: str = "postgresql://tokenguard:tokenguard_dev@localhost:5432/tokenguard"
+    database_url_async: str = "postgresql+asyncpg://tokenguard:tokenguard_dev@localhost:5432/tokenguard"
     redis_url: str = "redis://localhost:6379/0"
     jwt_secret: str = "dev-secret-change-in-production"
     sendgrid_api_key: str = ""

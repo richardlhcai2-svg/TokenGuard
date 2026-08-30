@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Numeric, DateTime, Index, desc
+from sqlalchemy import Column, String, Integer, Numeric, DateTime, Index, desc, Date as sa_Date
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -39,7 +39,7 @@ class DailySummary(Base):
     organization_id = Column(UUID(as_uuid=True), nullable=False)
     user_id = Column(UUID(as_uuid=True))
     tool_name = Column(String(50))
-    date = Column(DateTime, nullable=False)
+    date = Column(sa_Date, nullable=False)
     total_cost_usd = Column(Numeric(10, 4), default=0, nullable=False)
     total_input_tokens = Column(Integer, default=0, nullable=False)
     total_output_tokens = Column(Integer, default=0, nullable=False)

@@ -41,7 +41,7 @@ class TestOrganizationSchema:
 
 class TestUserSchema:
     def test_create_valid(self):
-        user = UserCreate(email="test@example.com", name="Test User")
+        user = UserCreate(email="test@example.com", name="Test User", password="secret123")
         assert user.email == "test@example.com"
         assert user.name == "Test User"
 

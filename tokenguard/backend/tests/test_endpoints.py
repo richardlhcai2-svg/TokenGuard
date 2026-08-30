@@ -105,8 +105,146 @@ class TestRouteRegistration:
         assert "/internal/usage" in paths
         assert "post" in paths["/internal/usage"]
 
-        # Dashboard endpoints
-        assert "/api/v1/dashboard/summary" in paths
-        assert "/api/v1/dashboard/trends" in paths
-        assert "/api/v1/dashboard/top-models" in paths
-        assert "/api/v1/dashboard/top-users" in paths
+        # Dashboard savings + recommendations + optimizations endpoints
+        assert "/api/v1/dashboard/savings" in paths
+        assert "get" in paths["/api/v1/dashboard/savings"]
+        assert "/api/v1/dashboard/recommendations" in paths
+        assert "get" in paths["/api/v1/dashboard/recommendations"]
+        assert "/api/v1/dashboard/optimizations" in paths
+        assert "get" in paths["/api/v1/dashboard/optimizations"]
+
+
+class TestSavingsEndpoint:
+    def test_savings_empty_data(self):
+        """Empty usage → zero savings."""
+        from app.core.database import get_async_db
+
+        mock_rows = MagicMock()
+        mock_rows.fetchall.return_value = []
+
+        mock_session = AsyncMock()
+
+        async def mock_execute(stmt):
+            return mock_rows
+
+        mock_session.execute = mock_execute
+
+        async def mock_gen():
+            yield mock_session
+
+        app.dependency_overrides[get_async_db] = mock_gen
+        try:
+            resp = client.get("/api/v1/dashboard/savings")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert float(data["total_actual_cost_usd"]) == 0.0
+            assert data["savings_pct"] == 0.0
+            assert data["per_model"] == []
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_savings_with_data(self):
+        """Has usage → non-zero savings estimate."""
+        from app.core.database import get_async_db
+        from decimal import Decimal
+        from datetime import datetime, timezone
+
+        mock_record = MagicMock()
+        mock_record.model_name = "claude-opus-4-20250514"
+        mock_record.provider = "anthropic"
+        mock_record.task_type = "debugging"
+        mock_record.cost_usd = Decimal("1.50")
+        mock_record.input_tokens = 10000
+        mock_record.output_tokens = 5000
+
+        mock_rows = MagicMock()
+        mock_rows.fetchall.return_value = [mock_record]
+
+        mock_session = AsyncMock()
+
+        async def mock_execute(stmt):
+            return mock_rows
+
+        mock_session.execute = mock_execute
+
+        async def mock_gen():
+            yield mock_session
+
+        app.dependency_overrides[get_async_db] = mock_gen
+        try:
+            resp = client.get("/api/v1/dashboard/savings?days=30")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["total_actual_cost_usd"] is not None
+            assert float(data["total_actual_cost_usd"]) > 0
+            assert len(data["per_model"]) >= 1
+            assert data["per_model"][0]["recommended_model"] == "claude-sonnet"  # cheapest for debugging
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestOptimizationsEndpoint:
+    def test_optimizations_empty_data(self):
+        """Empty usage → zero optimizations."""
+        from app.core.database import get_async_db
+
+        mock_rows = MagicMock()
+        mock_rows.fetchall.return_value = []
+
+        mock_session = AsyncMock()
+
+        async def mock_execute(stmt):
+            return mock_rows
+
+        mock_session.execute = mock_execute
+
+        async def mock_gen():
+            yield mock_session
+
+        app.dependency_overrides[get_async_db] = mock_gen
+        try:
+            resp = client.get("/api/v1/dashboard/optimizations")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert float(data["total_savings_usd"]) == 0.0
+            assert data["action_count"] == 0
+            assert data["actions"] == []
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_optimizations_with_usage(self):
+        """Usage data generates optimization actions."""
+        from app.core.database import get_async_db
+        from decimal import Decimal
+
+        mock_record = MagicMock()
+        mock_record.model_name = "claude-opus-4-20250514"
+        mock_record.provider = "anthropic"
+        mock_record.task_type = "documentation"
+        mock_record.cost_usd = Decimal("100.00")
+        mock_record.input_tokens = 500000
+        mock_record.output_tokens = 200000
+
+        mock_rows = MagicMock()
+        mock_rows.fetchall.return_value = [mock_record]
+
+        mock_session = AsyncMock()
+
+        async def mock_execute(stmt):
+            return mock_rows
+
+        mock_session.execute = mock_execute
+
+        async def mock_gen():
+            yield mock_session
+
+        app.dependency_overrides[get_async_db] = mock_gen
+        try:
+            resp = client.get("/api/v1/dashboard/optimizations?min_savings=0")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["action_count"] >= 1
+            assert data["actions"][0]["recommended_model"] == "claude-haiku"
+            assert data["actions"][0]["priority"] == "high"  # $100 savings should be high priority
+        finally:
+            app.dependency_overrides.clear()

@@ -11,23 +11,21 @@ console = Console()
 
 def _find_proxy_app():
     """Locate and import the proxy FastAPI app."""
-    # Try in-package path (pip install with proxy bundled)
+    # 1. Relative import within the package
     try:
-        from tokenguard.proxy.app.main import app
+        from .proxy.main import app
+        return app
+    except (ImportError, ValueError):
+        pass
+
+    # 2. Top-level package import (pip install)
+    try:
+        from tokenguard.proxy.main import app
         return app
     except ImportError:
         pass
-    # Try symlink path (dev mode: src/tokenguard/proxy -> proxy/app)
-    pkg_proxy = os.path.join(os.path.dirname(__file__), "proxy")
-    if os.path.isdir(pkg_proxy):
-        if pkg_proxy not in sys.path:
-            sys.path.insert(0, pkg_proxy)
-    try:
-        from app.main import app
-        return app
-    except ImportError:
-        pass
-    # Try project root path (dev mode: run from project root)
+
+    # 3. Project dev fallback
     dev = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "proxy")
     if os.path.isdir(dev) and dev not in sys.path:
         sys.path.insert(0, dev)

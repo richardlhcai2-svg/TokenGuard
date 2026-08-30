@@ -24,6 +24,7 @@ out/
 
 # OS
 .DS_Store
+._*
 Thumbs.db
 
 # Docker
@@ -35,6 +36,15 @@ redis-data/
 .env.*
 !.env.example
 
-# Logs
+# Logs & Cache
 *.log
 logs/
+.pytest_cache/
+
+# Databases & Local App State
+*.db
+*.sqlite
+*.sqlite3
+.tokenguard/
+.agents/
+.gemini/

@@ -1,7 +1,14 @@
--r ../../requirements-base.txt
-aiosqlite==0.20.0
+pydantic[email]==2.9.2
+pydantic-settings==2.5.0
+sqlalchemy[asyncio]==2.0.35
+asyncpg==0.29.0
+greenlet==3.1.1
+email-validator==2.2.0
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+httpx==0.27.0
+alembic==1.14.0
+psycopg2-binary==2.9.9
 pytest==8.3.0
 pytest-asyncio==0.24.0
 pytest-cov==6.0.0
-httpx==0.27.0
-alembic==1.14.0

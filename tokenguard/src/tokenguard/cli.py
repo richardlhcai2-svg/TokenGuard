@@ -43,10 +43,19 @@ def deploy(port):
 @cli.command()
 @click.option("--watch", "-w", is_flag=True, help="Auto-refresh every 3 seconds")
 @click.option("--days", default=7, type=int, help="Number of days to show")
-def stats(watch, days):
+@click.option("--project", "-p", default=None, type=str, help="Filter stats by project/workspace name")
+def stats(watch, days, project):
     """Show usage dashboard in the terminal."""
     from .stats import stats as _st
-    _st(watch=watch, days=days)
+    _st(watch=watch, days=days, project=project)
+
+
+@cli.command("projects")
+@click.option("--days", default=None, type=int, help="Number of days to analyze (default: all-time lifetime)")
+def projects_cmd(days):
+    """Show AI cost attribution broken down by Git Repository / Project / Workspace."""
+    from .stats import show_projects
+    show_projects(days=days)
 
 
 @cli.command()
@@ -56,3 +65,29 @@ def config(key, value):
     """View or set configuration (API keys, settings)."""
     from .config_cli import config_cmd
     config_cmd(key=key, value=value)
+
+
+@cli.command("dashboard")
+@click.option("--port", default=8001, type=int, help="Proxy dashboard port")
+def dashboard(port):
+    """Open visual dial dashboard in your web browser."""
+    import webbrowser
+    import urllib.request
+    from rich.console import Console
+
+    console = Console()
+    url = f"http://localhost:{port}/dashboard"
+    console.print(f"[bold cyan]🎯 Opening TokenGuard Visual Dashboard:[/bold cyan] [underline]{url}[/underline]")
+    try:
+        urllib.request.urlopen(f"http://localhost:{port}/health", timeout=1)
+    except Exception:
+        console.print(f"[yellow]⚠️ Note: TokenGuard proxy on port {port} is not running. Run 'tg serve' to start it.[/yellow]")
+    webbrowser.open(url)
+
+
+@cli.command("ui", hidden=True)
+@click.option("--port", default=8001, type=int, help="Proxy dashboard port")
+def ui_cmd(port):
+    """Alias for dashboard."""
+    import webbrowser
+    webbrowser.open(f"http://localhost:{port}/dashboard")
