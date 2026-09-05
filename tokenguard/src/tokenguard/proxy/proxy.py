@@ -1,18 +1,18 @@
-"""Provider-aware proxy dispatcher — routes requests to the correct handler."""
+"""Provider-aware proxy dispatcher with Persistent Connection Pool & Zero-Blocking Queue."""
 
 import asyncio
-import json
 import logging
 import os
 import time
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Request, Response, HTTPException
+from fastapi import APIRouter, Request, HTTPException
 
 from .handlers.anthropic import handle as handle_anthropic
 from .handlers.openai import handle as handle_openai
 from .handlers.gemini import handle as handle_gemini
+from .queue import enqueue_usage
 
 logger = logging.getLogger("tokenguard.proxy")
 
@@ -20,62 +20,49 @@ router = APIRouter()
 
 TG_KEY_HEADER = "x-tokenguard-key"
 
-_local_store = None
+_shared_client: Optional[httpx.AsyncClient] = None
+_client_loop: Optional[asyncio.AbstractEventLoop] = None
 
 
-def _get_local_store():
-    global _local_store
-    if _local_store is None:
-        try:
-            from tokenguard.storage import UsageStore
-            _local_store = UsageStore()
-        except ImportError:
-            try:
-                from ..storage import UsageStore
-                _local_store = UsageStore()
-            except Exception:
-                _local_store = None
-    return _local_store
-
-
-def _get_config():
+def get_shared_client() -> httpx.AsyncClient:
+    """Get or initialize a thread/loop-safe shared httpx connection pool."""
+    global _shared_client, _client_loop
     try:
-        from tokenguard import config
-        return config
-    except Exception:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+
+    needs_new_client = (
+        _shared_client is None
+        or _shared_client.is_closed
+        or (_client_loop is not None and _client_loop is not current_loop)
+        or (_client_loop is not None and _client_loop.is_closed())
+    )
+
+    if needs_new_client:
+        client_timeout = httpx.Timeout(60.0, connect=10.0, read=300.0, pool=10.0)
+        limits = httpx.Limits(max_connections=200, max_keepalive_connections=50, keepalive_expiry=30.0)
+        _shared_client = httpx.AsyncClient(timeout=client_timeout, limits=limits)
+        _client_loop = current_loop
+
+    return _shared_client
+
+
+async def close_shared_client():
+    """Gracefully close the global connection pool on shutdown."""
+    global _shared_client, _client_loop
+    if _shared_client is not None and not _shared_client.is_closed:
         try:
-            from ... import config
-            return config
-        except Exception:
-            return None
-
-
-async def _save_usage_async(usage: dict, session_id: Optional[str]):
-    """Async fire-and-forget usage save.
-    Always saves instantly to local SQLite, and syncs to backend if configured."""
-    payload = {**usage, "session_id": session_id}
-
-    # 1. Always save instantly to local SQLite store
-    local_store = _get_local_store()
-    if local_store is not None:
-        try:
-            local_store.save_usage(payload)
-        except Exception as e:
-            logger.error("Failed to save to local SQLite: %s", e)
-
-    # 2. If running with a remote backend, sync asynchronously
-    backend_url = os.getenv("BACKEND_URL")
-    if backend_url and "backend:8000" not in backend_url:
-        proxy_secret = os.getenv("PROXY_SECRET", "")
-        headers = {
-            "Content-Type": "application/json",
-            "x-tokenguard-key": proxy_secret,
-        }
-        try:
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                await client.post(f"{backend_url}/internal/usage", json=payload, headers=headers)
+            await _shared_client.aclose()
         except Exception:
             pass
+        _shared_client = None
+        _client_loop = None
+
+
+async def _save_usage_async(usage: dict, session_id: Optional[str] = None):
+    """Compatibility wrapper: enqueue to non-blocking memory queue."""
+    enqueue_usage(usage, session_id)
 
 
 def _validate_tokenguard_key(request: Request) -> dict:
@@ -134,22 +121,23 @@ async def proxy_request(request: Request, path: str):
     headers = _validate_tokenguard_key(request)
     body_bytes = await request.body()
     start_time = time.time()
+    client = get_shared_client()
 
     # Dispatch by the first path segment
     first_segment = path.split("/")[0] if path else ""
 
     if first_segment == "anthropic":
-        return await handle_anthropic(request, path.removeprefix("anthropic/"), body_bytes, headers, start_time)
+        return await handle_anthropic(request, path.removeprefix("anthropic/"), body_bytes, headers, start_time, client=client)
 
     elif first_segment == "openai":
-        return await handle_openai(request, path.removeprefix("openai/"), body_bytes, headers, start_time, provider="openai")
+        return await handle_openai(request, path.removeprefix("openai/"), body_bytes, headers, start_time, provider="openai", client=client)
 
     elif first_segment == "gemini":
-        return await handle_gemini(request, path.removeprefix("gemini/"), body_bytes, headers, start_time)
+        return await handle_gemini(request, path.removeprefix("gemini/"), body_bytes, headers, start_time, client=client)
 
     elif first_segment == "deepseek":
-        return await handle_openai(request, path.removeprefix("deepseek/"), body_bytes, headers, start_time, provider="deepseek")
+        return await handle_openai(request, path.removeprefix("deepseek/"), body_bytes, headers, start_time, provider="deepseek", client=client)
 
     else:
         # Legacy: no provider prefix → assume Anthropic
-        return await handle_anthropic(request, path, body_bytes, headers, start_time)
+        return await handle_anthropic(request, path, body_bytes, headers, start_time, client=client)

@@ -41,6 +41,8 @@ class UsageStore:
         conn = sqlite3.connect(str(self.db_path), timeout=10.0)
         conn.execute("PRAGMA journal_mode = WAL;")
         conn.execute("PRAGMA synchronous = NORMAL;")
+        conn.execute("PRAGMA busy_timeout = 5000;")
+        conn.execute("PRAGMA wal_autocheckpoint = 1000;")
         conn.row_factory = sqlite3.Row
         return conn
 
@@ -81,19 +83,68 @@ class UsageStore:
             conn.commit()
             return cursor.lastrowid
 
-    def get_stats(self, days: int = 7, project: Optional[str] = None) -> dict:
-        cutoff = time.time() - days * 86400
+    def save_usage_batch(self, records: List[dict]) -> int:
+        """Batch insert usage records in a single optimized transaction."""
+        if not records:
+            return 0
+        data = [
+            (
+                r.get("model_name", "unknown"),
+                r.get("provider", "unknown"),
+                r.get("project_name", "General"),
+                r.get("input_tokens", 0),
+                r.get("output_tokens", 0),
+                r.get("cache_creation_tokens", 0),
+                r.get("cache_read_tokens", 0),
+                r.get("cost_usd", 0.0),
+                r.get("context_usage_pct", 0.0),
+                r.get("context_warning", False),
+                r.get("session_id"),
+                r.get("started_at", time.time()),
+            )
+            for r in records
+        ]
+        with self._get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.executemany(
+                """INSERT INTO usage_records
+                   (model_name, provider, project_name, input_tokens, output_tokens,
+                    cache_creation_tokens, cache_read_tokens, cost_usd,
+                    context_usage_pct, context_warning, session_id, started_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                data,
+            )
+            conn.commit()
+            return len(data)
+
+    def checkpoint_wal(self) -> None:
+        """Execute SQLite WAL truncation to prevent unbounded disk growth."""
+        try:
+            with self._get_conn() as conn:
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+        except Exception:
+            pass
+
+    def get_stats(self, days: Optional[int] = 7, project: Optional[str] = None) -> dict:
         with self._get_conn() as conn:
             query = """SELECT
                     COUNT(*) as total_requests,
                     COALESCE(SUM(cost_usd), 0) as total_spent,
                     COALESCE(SUM(input_tokens + output_tokens), 0) as total_tokens,
                     COALESCE(AVG(cost_usd), 0) as avg_cost_per_req
-                   FROM usage_records WHERE started_at >= ?"""
-            params = [cutoff]
+                   FROM usage_records"""
+            params = []
+            where_clauses = []
+            if days and int(days) > 0:
+                cutoff = time.time() - int(days) * 86400
+                where_clauses.append("started_at >= ?")
+                params.append(cutoff)
             if project and project != "all":
-                query += " AND project_name = ?"
+                where_clauses.append("project_name = ?")
                 params.append(project)
+
+            if where_clauses:
+                query += " WHERE " + " AND ".join(where_clauses)
 
             row = conn.execute(query, tuple(params)).fetchone()
             return {
@@ -104,7 +155,7 @@ class UsageStore:
             }
 
     def get_project_stats(self, days: Optional[int] = None) -> list:
-        """Get project-level cost and token attribution. If days is None, returns all-time attribution from project inception."""
+        """Get project-level cost and token attribution. If days is None or 0, returns all-time attribution from project inception."""
         with self._get_conn() as conn:
             query = """SELECT
                     project_name,
@@ -117,8 +168,8 @@ class UsageStore:
                     MAX(started_at) as last_active
                    FROM usage_records"""
             params = []
-            if days is not None:
-                cutoff = time.time() - days * 86400
+            if days is not None and int(days) > 0:
+                cutoff = time.time() - int(days) * 86400
                 query += " WHERE started_at >= ?"
                 params.append(cutoff)
             query += """ GROUP BY project_name
@@ -140,19 +191,26 @@ class UsageStore:
                 for r in rows
             ]
 
-    def get_top_models(self, days: int = 7, limit: int = 5, project: Optional[str] = None) -> list:
-        cutoff = time.time() - days * 86400
+    def get_top_models(self, days: Optional[int] = 7, limit: int = 5, project: Optional[str] = None) -> list:
         with self._get_conn() as conn:
             query = """SELECT model_name, provider,
                           COUNT(*) as requests,
                           COALESCE(SUM(cost_usd), 0) as total_spent,
                           COALESCE(SUM(input_tokens + output_tokens), 0) as total_tokens
-                   FROM usage_records
-                   WHERE started_at >= ?"""
-            params = [cutoff]
+                   FROM usage_records"""
+            params = []
+            where_clauses = []
+            if days and int(days) > 0:
+                cutoff = time.time() - int(days) * 86400
+                where_clauses.append("started_at >= ?")
+                params.append(cutoff)
             if project and project != "all":
-                query += " AND project_name = ?"
+                where_clauses.append("project_name = ?")
                 params.append(project)
+
+            if where_clauses:
+                query += " WHERE " + " AND ".join(where_clauses)
+
             query += """ GROUP BY model_name, provider
                    ORDER BY total_spent DESC
                    LIMIT ?"""
@@ -185,20 +243,27 @@ class UsageStore:
             rows = conn.execute(query, tuple(params)).fetchall()
             return [dict(r) for r in rows]
 
-    def get_daily_totals(self, days: int = 7, project: Optional[str] = None) -> list:
-        cutoff = time.time() - days * 86400
+    def get_daily_totals(self, days: Optional[int] = 7, project: Optional[str] = None) -> list:
         with self._get_conn() as conn:
             query = """SELECT
                     DATE(started_at, 'unixepoch', 'localtime') as day,
                     COUNT(*) as requests,
                     COALESCE(SUM(cost_usd), 0) as total_spent,
                     COALESCE(SUM(input_tokens + output_tokens), 0) as total_tokens
-                   FROM usage_records
-                   WHERE started_at >= ?"""
-            params = [cutoff]
+                   FROM usage_records"""
+            params = []
+            where_clauses = []
+            if days and int(days) > 0:
+                cutoff = time.time() - int(days) * 86400
+                where_clauses.append("started_at >= ?")
+                params.append(cutoff)
             if project and project != "all":
-                query += " AND project_name = ?"
+                where_clauses.append("project_name = ?")
                 params.append(project)
+
+            if where_clauses:
+                query += " WHERE " + " AND ".join(where_clauses)
+
             query += " GROUP BY day ORDER BY day ASC"
 
             rows = conn.execute(query, tuple(params)).fetchall()

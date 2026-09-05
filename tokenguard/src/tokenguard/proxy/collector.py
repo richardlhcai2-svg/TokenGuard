@@ -79,7 +79,7 @@ def _resolve_project_from_text(text: str, default: str = "General") -> str:
     return default
 
 
-def collect_local_coding_tools_activity(db_path: Optional[str] = None):
+def collect_local_coding_tools_activity(db_path: Optional[str] = None) -> int:
     """
     Sync usage and context from local AI developer tools:
     1. Claude Code CLI (~/.claude/projects/*/*.jsonl)
@@ -87,15 +87,38 @@ def collect_local_coding_tools_activity(db_path: Optional[str] = None):
     3. ChatGPT / OpenAI Codex (~/Library/Application Support/OpenAI/Codex/sqlite.db or ~/.config/openai/codex.db)
     
     Optimized with file mtime/size caching for minimal CPU and zero redundant disk I/O.
+    Returns total count of newly inserted records.
     """
     if not db_path:
-        db_path = os.path.expanduser("~/.tokenguard/tokenguard.db")
+        db_path = os.path.expanduser("~/.tokenguard/usage.db")
     
     if not os.path.exists(db_path):
-        return
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
-    with sqlite3.connect(db_path) as conn:
+    new_synced_count = 0
+    with sqlite3.connect(db_path, timeout=10.0) as conn:
+        conn.execute("PRAGMA journal_mode = WAL;")
+        conn.execute("PRAGMA busy_timeout = 5000;")
         cur = conn.cursor()
+
+        # Ensure schema table exists
+        cur.execute(
+            """CREATE TABLE IF NOT EXISTS usage_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                model_name TEXT NOT NULL,
+                provider TEXT NOT NULL DEFAULT 'unknown',
+                project_name TEXT NOT NULL DEFAULT 'General',
+                input_tokens INTEGER NOT NULL DEFAULT 0,
+                output_tokens INTEGER NOT NULL DEFAULT 0,
+                cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+                cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+                cost_usd REAL NOT NULL DEFAULT 0.0,
+                context_usage_pct REAL NOT NULL DEFAULT 0.0,
+                context_warning INTEGER NOT NULL DEFAULT 0,
+                session_id TEXT,
+                started_at REAL NOT NULL
+            );"""
+        )
 
         # Ensure project_name column exists
         columns = [row[1] for row in cur.execute("PRAGMA table_info(usage_records)").fetchall()]
@@ -202,6 +225,7 @@ def collect_local_coding_tools_activity(db_path: Optional[str] = None):
                         ),
                     )
                     synced.add(step_id)
+                    new_synced_count += 1
 
                 _FILE_MOD_CACHE[f] = (mtime, size)
         except Exception as e:
@@ -293,6 +317,7 @@ def collect_local_coding_tools_activity(db_path: Optional[str] = None):
                         ),
                     )
                     synced.add(step_id)
+                    new_synced_count += 1
 
                 _FILE_MOD_CACHE[f] = (mtime, size)
         except Exception as e:
@@ -367,19 +392,30 @@ def collect_local_coding_tools_activity(db_path: Optional[str] = None):
                                 ),
                             )
                             synced.add(step_id)
+                            new_synced_count += 1
 
                     _FILE_MOD_CACHE[codex_db] = (mtime, size)
             except Exception as e:
                 logger.debug("Codex sync notice: %s", e)
 
         conn.commit()
+    return new_synced_count
 
 
-async def start_collector_loop(interval_seconds: float = 3.0, db_path: Optional[str] = None):
-    """Background loop that periodically syncs local coding tools activity with minimal CPU overhead."""
+async def start_collector_loop(interval_seconds: float = 60.0, db_path: Optional[str] = None):
+    """Background loop that periodically syncs local coding tools activity with adaptive idle backoff."""
+    current_interval = interval_seconds
     while True:
         try:
-            collect_local_coding_tools_activity(db_path=db_path)
+            new_records = await asyncio.to_thread(collect_local_coding_tools_activity, db_path=db_path)
+            if new_records and new_records > 0:
+                current_interval = max(30.0, interval_seconds)
+            else:
+                current_interval = min(300.0, current_interval * 1.5)
+        except asyncio.CancelledError:
+            break
         except Exception as e:
-            logger.debug("Collector loop iteration error: %s", e)
-        await asyncio.sleep(interval_seconds)
+            logger.debug("Collector loop iteration notice: %s", e)
+            current_interval = 60.0
+        await asyncio.sleep(current_interval)
+

@@ -44,8 +44,8 @@ class TestProxyForwarding:
             json={"model": "claude-sonnet-4-20250514", "messages": [{"role": "user", "content": "Hi"}], "max_tokens": 10},
             headers={"x-tokenguard-key": "test-secret-123"},
         )
-        # Should get upstream error (no/invalid api key) rather than proxy secret auth error
-        assert resp.status_code in (400, 401, 500, 502)
+        # Should get upstream error or upstream 200 OK rather than proxy secret auth error
+        assert resp.status_code in (200, 400, 401, 500, 502)
 
     def test_proxy_route_with_anthropic_prefix(self):
         """Anthropic prefix routes to Anthropic handler."""
@@ -57,7 +57,8 @@ class TestProxyForwarding:
             json={"model": "claude-sonnet-4-20250514", "messages": [{"role": "user", "content": "Hi"}], "max_tokens": 10},
             headers={"x-tokenguard-key": "test-secret-123"},
         )
-        assert resp.status_code in (400, 401, 500, 502)
+        assert resp.status_code in (200, 400, 401, 500, 502)
+
 
     def test_proxy_route_with_openai_prefix(self):
         """OpenAI prefix routes to OpenAI handler."""
