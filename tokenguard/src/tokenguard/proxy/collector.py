@@ -15,10 +15,8 @@ from .pricing import get_model_cost, get_context_window
 logger = logging.getLogger("tokenguard.collector")
 
 KNOWN_PROJECTS = [
-    "socialmind-ai", "socialmind", "painradar", "EngineeringOS", "contentlens-ai",
-    "bp-builder", "geo-platform", "copyproof-ai", "DataLensAI", "launchpad-ai",
-    "claimlens", "bookpilot-ai", "AiforFA", "ContentROI", "AgentGuard", "ppt-master",
-    "BrokerPilot", "tokenguard", "Panstone"
+    "my-web-app", "data-pipeline", "ai-agent", "frontend-dashboard",
+    "workspace-core", "tokenguard", "demo-project", "api-backend"
 ]
 
 # File modification cache to avoid redundant disk I/O on unmodified sessions
@@ -358,7 +356,7 @@ def collect_local_coding_tools_activity(db_path: Optional[str] = None) -> int:
                             if step_id in synced:
                                 continue
 
-                            project_name = _resolve_project_from_text(turn_text, default="Panstone")
+                            project_name = _resolve_project_from_text(turn_text, default="General")
 
                             in_toks = max(300, int(curr_len / 3.8))
                             out_toks = max(50, int(len(turn_text) / 8.0))

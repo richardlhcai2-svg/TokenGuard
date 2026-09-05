@@ -34,7 +34,7 @@
 - [ ] **Step 1: Create pyproject.toml**
 
 ```toml
-# /Users/mac/projects/tokenguard/tokenguard/pyproject.toml
+# /path/to/projects/tokenguard/tokenguard/pyproject.toml
 [build-system]
 requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.backends._legacy:_Backend"
@@ -93,7 +93,7 @@ cli()
 - [ ] **Step 3: Create MANIFEST.in**
 
 ```
-# /Users/mac/projects/tokenguard/tokenguard/MANIFEST.in
+# /path/to/projects/tokenguard/tokenguard/MANIFEST.in
 graft src/tokenguard/proxy
 ```
 
@@ -101,7 +101,7 @@ graft src/tokenguard/proxy
 
 Run:
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && pip install -e .
+cd /path/to/projects/tokenguard/tokenguard && pip install -e .
 ```
 
 Expected: `tg --help` produces help output
@@ -384,7 +384,7 @@ class TestConfig:
 
 Run:
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && python -m pytest tests/test_config.py -v
+cd /path/to/projects/tokenguard/tokenguard && python -m pytest tests/test_config.py -v
 ```
 
 Expected: 8 tests pass
@@ -653,7 +653,7 @@ class TestUsageStore:
 
 Run:
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && python -m pytest tests/test_storage.py -v
+cd /path/to/projects/tokenguard/tokenguard && python -m pytest tests/test_storage.py -v
 ```
 
 Expected: all tests pass
@@ -852,7 +852,7 @@ class TestStatsFormatting:
 
 Run:
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && python -m pytest tests/test_stats.py tests/test_storage.py -v
+cd /path/to/projects/tokenguard/tokenguard && python -m pytest tests/test_stats.py tests/test_storage.py -v
 ```
 
 Expected: all tests pass
@@ -935,7 +935,7 @@ async def _save_usage_async(usage: dict, session_id: Optional[str] = None):
 
 Run:
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard/proxy && python -m pytest tests/ -v
+cd /path/to/projects/tokenguard/tokenguard/proxy && python -m pytest tests/ -v
 ```
 
 Expected: all 43 proxy tests pass
@@ -1085,7 +1085,7 @@ def quickstart():
 
 Run:
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && echo -e "\n\n\n\n\n\n\n" | python -m tokenguard quickstart 2>&1 | head -20
+cd /path/to/projects/tokenguard/tokenguard && echo -e "\n\n\n\n\n\n\n" | python -m tokenguard quickstart 2>&1 | head -20
 ```
 
 Expected: wizard runs and completes (all defaults/skips)
@@ -1355,7 +1355,7 @@ graft src/tokenguard/proxy
 - [ ] **Step 4: pip install -e . to verify**
 
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && pip install -e . 2>&1 | tail -5
+cd /path/to/projects/tokenguard/tokenguard && pip install -e . 2>&1 | tail -5
 tg --help
 ```
 
@@ -1666,7 +1666,7 @@ class TestConfig:
 - [ ] **Step 5: Run tests**
 
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && python -m pytest tests/test_config.py -v
+cd /path/to/projects/tokenguard/tokenguard && python -m pytest tests/test_config.py -v
 ```
 
 Expected: 7 tests pass
@@ -1885,7 +1885,7 @@ class TestUsageStore:
 - [ ] **Step 3: Run tests**
 
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && python -m pytest tests/test_storage.py -v
+cd /path/to/projects/tokenguard/tokenguard && python -m pytest tests/test_storage.py -v
 ```
 
 Expected: all tests pass
@@ -2024,7 +2024,7 @@ class TestStatsFormatting:
 - [ ] **Step 3: Run tests**
 
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && python -m pytest tests/test_stats.py tests/test_storage.py -v
+cd /path/to/projects/tokenguard/tokenguard && python -m pytest tests/test_stats.py tests/test_storage.py -v
 ```
 
 Expected: all pass
@@ -2143,7 +2143,7 @@ In `_save_usage_async`, after the retry loop for backend, add:
 
 ```bash
 # Create symlink so pip package can access proxy code
-cd /Users/mac/projects/tokenguard/tokenguard/src/tokenguard && ln -sf ../../proxy/app proxy
+cd /path/to/projects/tokenguard/tokenguard/src/tokenguard && ln -sf ../../proxy/app proxy
 ```
 
 This makes `src/tokenguard/proxy/` point to `proxy/app/` so `from tokenguard.proxy.app.main import app` works both in dev and when installed.
@@ -2151,7 +2151,7 @@ This makes `src/tokenguard/proxy/` point to `proxy/app/` so `from tokenguard.pro
 - [ ] **Step 4: Verify proxy tests still pass**
 
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard/proxy && python -m pytest tests/ -v
+cd /path/to/projects/tokenguard/tokenguard/proxy && python -m pytest tests/ -v
 ```
 
 Expected: all 43 proxy tests pass
@@ -2159,7 +2159,7 @@ Expected: all 43 proxy tests pass
 - [ ] **Step 5: Test tg serve loads (quick smoke test)**
 
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && timeout 3 tg serve --port 8999 2>&1 || true
+cd /path/to/projects/tokenguard/tokenguard && timeout 3 tg serve --port 8999 2>&1 || true
 ```
 
 Expected: shows the startup panel, then exits after timeout
@@ -2280,7 +2280,7 @@ def _show_next_steps():
 - [ ] **Step 2: Test quickstart**
 
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && echo -e "\n\n\n\n\n\n\n" | python -m tokenguard quickstart 2>&1 | head -20
+cd /path/to/projects/tokenguard/tokenguard && echo -e "\n\n\n\n\n\n\n" | python -m tokenguard quickstart 2>&1 | head -20
 ```
 
 Expected: wizard runs and completes
@@ -2360,7 +2360,7 @@ def deploy(port: int = 8001):
 - [ ] **Step 2: Test deploy detects compose file**
 
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && python -c "from tokenguard.deploy import deploy; print('imports ok')"
+cd /path/to/projects/tokenguard/tokenguard && python -c "from tokenguard.deploy import deploy; print('imports ok')"
 ```
 
 Expected: no errors
@@ -2500,7 +2500,7 @@ git commit -m "docs: add README with quick start guide"
 - [ ] **Step 1: Run proxy tests**
 
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard/proxy && python -m pytest tests/ -v
+cd /path/to/projects/tokenguard/tokenguard/proxy && python -m pytest tests/ -v
 ```
 
 Expected: all 43 proxy tests pass
@@ -2508,7 +2508,7 @@ Expected: all 43 proxy tests pass
 - [ ] **Step 2: Run backend tests**
 
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard/backend && python -m pytest tests/ -v 2>&1 | tail -20
+cd /path/to/projects/tokenguard/tokenguard/backend && python -m pytest tests/ -v 2>&1 | tail -20
 ```
 
 Expected: all 24 backend tests pass
@@ -2516,7 +2516,7 @@ Expected: all 24 backend tests pass
 - [ ] **Step 3: Run new CLI tests**
 
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && python -m pytest tests/ -v
+cd /path/to/projects/tokenguard/tokenguard && python -m pytest tests/ -v
 ```
 
 Expected: all config, storage, and stats tests pass
@@ -2537,7 +2537,7 @@ Expected: all show help text
 - [ ] **Step 5: Verify Docker stack still builds**
 
 ```bash
-cd /Users/mac/projects/tokenguard/tokenguard && docker compose build proxy 2>&1 | tail -5
+cd /path/to/projects/tokenguard/tokenguard && docker compose build proxy 2>&1 | tail -5
 ```
 
 Expected: build succeeds

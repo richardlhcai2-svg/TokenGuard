@@ -50,7 +50,7 @@ tg serve
 - 🟡 **DeepSeek** (DeepSeek-V4-Flash / R1 / V4-Pro)
 
 ### 3. 📁 全生命周期 Git 仓库与工作区成本归集 (Project Attribution)
-- 自动智能嗅探请求来源的 Git 仓库与本地目录（如 `socialmind-ai`、`tokenguard`、`Panstone`、`EngineeringOS`）。
+- 自动智能嗅探请求来源的 Git 仓库与本地目录（如 `my-web-app`、`ai-agent`、`data-pipeline`、`tokenguard`）。
 - 精确追踪每个项目从立项第一天起的全生命周期美金花费、Token 吞吐量与请求次数。
 
 ### 4. 🎨 极客品味级深色玻璃拟态 Web 仪表盘 (HUD Dashboard)
@@ -123,6 +123,23 @@ x-tokenguard-key: <您的代理私钥>
 
 ---
 
+## 📁 项目成本归集呈现示例
+
+```text
+╭────────────── 📁 Project Cost Attribution (All-Time Lifetime) ───────────────╮
+│                📁 AI Cost Attribution by Project / Workspace                 │
+│  Project /                                                                   │
+│  Workspace             Spent  Share         Tokens  Calls  Last Active       │
+│  📁 my-web-app        $18.50  38.1%     35,240,100    420  2026-09-04 15:05  │
+│  📁 ai-agent          $14.20  29.3%     28,150,000    310  2026-09-04 14:31  │
+│  📁 data-pipeline      $8.60  17.7%     16,400,000    185  2026-09-03 02:43  │
+│  📁 frontend-dash      $4.40   9.1%      8,200,000    120  2026-09-01 20:55  │
+│  📁 tokenguard         $2.80   5.8%      5,100,000     80  2026-09-04 16:33  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+---
+
 ## 🖥️ 仪表盘驾驶舱概览
 
 在浏览器打开 **`http://localhost:8001/dashboard`**：
@@ -131,15 +148,15 @@ x-tokenguard-key: <您的代理私钥>
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ 🛡️ TokenGuard  |  🟢 Telemetry Active (8001)  |  [今日 (24h)] [7天] [30天] [全生命周期]  │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
-│  [💰 统计期总花费: $532.79]   [⚡ Token 吞吐: 3.94 B]   [📊 拦截请求: 28,254]  [🟢 运行平稳] │
+│  [💰 统计期总花费: $48.50]    [⚡ Token 吞吐: 12.8 M]    [📊 拦截请求: 1,420]   [🟢 运行平稳] │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │  AI 编程软件专属监控矩阵 (4-Tool Cockpit Matrix):                                        │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────────┐ │
 │  │ 🟣 Claude Code   │  │ 🟢 Antigravity   │  │ 🔵 ChatGPT       │  │ 🟡 DeepSeek     │ │
-│  │ Spent: $198.52   │  │ Spent: $165.35   │  │ Spent: $48.93    │  │ Spent: $120.10  │ │
-│  │ Tokens: 1.84 B   │  │ Tokens: 1.65 B   │  │ Tokens: 7.21 M   │  │ Tokens: 436.9 M │ │
-│  │ Context: 78.1%   │  │ Context: 19.5%   │  │ Context: 76.6%   │  │ Context: 208.2% │ │
-│  │ [Run /compact]   │  │ [Healthy]        │  │ [Open Thread]    │  │ [Clear History] │ │
+│  │ Spent: $22.40    │  │ Spent: $14.60    │  │ Spent: $6.80     │  │ Spent: $4.70    │ │
+│  │ Tokens: 5.4 M    │  │ Tokens: 4.8 M    │  │ Tokens: 1.2 M    │  │ Tokens: 1.4 M   │ │
+│  │ Context: 42.5%   │  │ Context: 18.2%   │  │ Context: 35.0%   │  │ Context: 68.4%  │ │
+│  │ [Safe]           │  │ [Healthy]        │  │ [Safe]           │  │ [Safe]          │ │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘  └─────────────────┘ │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │  📈 每日消费趋势与 Token 轨迹 (动态 SVG 面积图)   |   🏆 热门模型消费占比排行榜             │
@@ -198,14 +215,20 @@ graph TD
 
 ## 💰 全面内嵌官方模型计费与 Prompt Caching 折扣
 
-| 提供商 | 支持模型系列 | 缓存折扣算法 |
-|---|---|---|
-| **Anthropic** | Claude 3.7 Sonnet、Claude 3.5 Sonnet、Claude 3.5 Haiku、Claude 3/4 Opus | **官方 90% 缓存读取折扣** |
-| **Google Gemini** | Gemini 3.7 Pro、Gemini 2.5 Flash、Gemini 2.0 Flash、Gemini 1.5 Pro | **官方 75% 上下文缓存折扣** |
-| **OpenAI** | GPT-5.6 Sol、GPT-4o、o1、o3-mini、o4、Codex | **官方 50% 缓存读取折扣** |
-| **DeepSeek 深度求索** | DeepSeek-V4-Flash、DeepSeek-V3、DeepSeek-R1 推理模型 | **官方 74% 缓存命中折扣** |
-| **Groq / 开源生态** | Llama 3.3 70B、Llama 3.1 8B、Mixtral 8x7B、Gemma 2 9B | 官方极速计费阶梯 |
-| **国产大模型矩阵** | Kimi K3、智谱 GLM-5.2 / GLM-4-Plus、阿里通义千问 Qwen 2.5 72B | 分级定价与免费额度智能适配 |
+| 提供商 | 支持模型系列 | 官方标准费率 (每 100 万输入/输出) | 缓存折扣计算 |
+|---|---|---|---|
+| **Anthropic** | Claude 3.7 / 3.5 Sonnet | $3.00 / $15.00 | **官方 90% 缓存读取折扣 ($0.30/1M)** |
+| **Anthropic** | Claude 3.5 Haiku | $0.80 / $4.00 | **官方 90% 缓存读取折扣 ($0.08/1M)** |
+| **Anthropic** | Claude 3 / 4 Opus | $15.00 / $75.00 | **官方 90% 缓存读取折扣 ($1.50/1M)** |
+| **Google Gemini** | Gemini 3.7 / 2.5 / 2.0 Flash | $0.10 / $0.40 | **官方 75% 上下文缓存折扣 ($0.025/1M)** |
+| **Google Gemini** | Gemini 2.5 / 3.1 Pro | $1.25 / $5.00 | **官方 75% 上下文缓存折扣 ($0.31/1M)** |
+| **OpenAI** | GPT-4o | $2.50 / $10.00 | **官方 50% 缓存读取折扣 ($1.25/1M)** |
+| **OpenAI** | GPT-5.6 Sol (Codex) | $5.00 / $15.00 | **官方 50% 缓存读取折扣 ($2.50/1M)** |
+| **OpenAI** | o3-mini / o1-mini | $1.10 / $4.40 | **官方 50% 缓存读取折扣 ($0.55/1M)** |
+| **DeepSeek 深度求索** | DeepSeek-V4-Flash / V3 | $0.27 / $1.10 | **官方 74% 缓存命中折扣 ($0.07/1M)** |
+| **DeepSeek 深度求索** | DeepSeek-R1 推理模型 | $0.55 / $2.19 | **官方 74% 缓存命中折扣 ($0.14/1M)** |
+| **Groq / 开源生态** | Llama 3.3 70B, Mixtral | $0.59 / $0.79 | 官方极速计费阶梯 |
+| **国产大模型矩阵** | Kimi K3, 智谱 GLM-5.2, 通义千问 2.5 | 官方分级定价 | 免费节点与长文本窗口智能适配 |
 
 ---
 

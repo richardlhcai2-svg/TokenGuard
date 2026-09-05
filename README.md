@@ -50,7 +50,7 @@ Real-time operational telemetry, live context window pressure (0–100%+), peak 
 - 🟡 **DeepSeek** (DeepSeek-V4-Flash / R1 / V4-Pro)
 
 ### 3. 📁 Lifetime Git Project & Workspace Attribution
-- Automatically attributes token usage to active Git repositories (e.g. `socialmind-ai`, `tokenguard`, `Panstone`, `EngineeringOS`).
+- Automatically attributes token usage to active Git repositories (e.g. `my-web-app`, `ai-agent`, `data-pipeline`, `tokenguard`).
 - Track lifetime expenditures, token throughput, and invocation frequency per project.
 
 ### 4. 🎨 Taste-Engineered Visual HUD Dashboard
@@ -123,6 +123,23 @@ x-tokenguard-key: <your-proxy-secret>
 
 ---
 
+## 📁 Project Cost Attribution in Action
+
+```text
+╭────────────── 📁 Project Cost Attribution (All-Time Lifetime) ───────────────╮
+│                📁 AI Cost Attribution by Project / Workspace                 │
+│  Project /                                                                   │
+│  Workspace             Spent  Share         Tokens  Calls  Last Active       │
+│  📁 my-web-app        $18.50  38.1%     35,240,100    420  2026-09-04 15:05  │
+│  📁 ai-agent          $14.20  29.3%     28,150,000    310  2026-09-04 14:31  │
+│  📁 data-pipeline      $8.60  17.7%     16,400,000    185  2026-09-03 02:43  │
+│  📁 frontend-dash      $4.40   9.1%      8,200,000    120  2026-09-01 20:55  │
+│  📁 tokenguard         $2.80   5.8%      5,100,000     80  2026-09-04 16:33  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+---
+
 ## 🖥️ Web Dashboard Preview
 
 Open **`http://localhost:8001/dashboard`** in your browser:
@@ -131,15 +148,15 @@ Open **`http://localhost:8001/dashboard`** in your browser:
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ 🛡️ TokenGuard  |  🟢 Telemetry Active (8001)  |  [今日 (24h)] [7天] [30天] [全生命周期]  │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
-│  [💰 统计期总花费: $532.79]   [⚡ Token 吞吐: 3.94 B]   [📊 拦截请求: 28,254]  [🟢 运行平稳] │
+│  [💰 统计期总花费: $48.50]    [⚡ Token 吞吐: 12.8 M]    [📊 拦截请求: 1,420]   [🟢 运行平稳] │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │  AI 编程软件专属监控矩阵 (4-Tool Cockpit Matrix):                                        │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────────┐ │
 │  │ 🟣 Claude Code   │  │ 🟢 Antigravity   │  │ 🔵 ChatGPT       │  │ 🟡 DeepSeek     │ │
-│  │ Spent: $1986.52  │  │ Spent: $865.35   │  │ Spent: $48.93    │  │ Spent: $120.10  │ │
-│  │ Tokens: 1.84 B   │  │ Tokens: 1.65 B   │  │ Tokens: 7.21 M   │  │ Tokens: 436.9 M │ │
-│  │ Context: 78.1%   │  │ Context: 19.5%   │  │ Context: 76.6%   │  │ Context: 208.2% │ │
-│  │ [Run /compact]   │  │ [Healthy]        │  │ [Open Thread]    │  │ [Clear History] │ │
+│  │ Spent: $22.40    │  │ Spent: $14.60    │  │ Spent: $6.80     │  │ Spent: $4.70    │ │
+│  │ Tokens: 5.4 M    │  │ Tokens: 4.8 M    │  │ Tokens: 1.2 M    │  │ Tokens: 1.4 M   │ │
+│  │ Context: 42.5%   │  │ Context: 18.2%   │  │ Context: 35.0%   │  │ Context: 68.4%  │ │
+│  │ [Safe]           │  │ [Healthy]        │  │ [Safe]           │  │ [Safe]          │ │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘  └─────────────────┘ │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │  📈 每日消费趋势与 Token 轨迹 (SVG Area Chart)   |   🏆 热门模型消费占比排行榜              │
@@ -200,14 +217,20 @@ graph TD
 
 TokenGuard features built-in 2025/2026 pricing tables with accurate cache discount calculations:
 
-| Provider | Supported Models | Cache Discount |
-|---|---|---|
-| **Anthropic** | Claude 3.7 Sonnet, Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3/4 Opus | **90% Read Discount** |
-| **Google Gemini** | Gemini 3.7 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash, Gemini 1.5 Pro | **75% Context Discount** |
-| **OpenAI** | GPT-5.6 Sol, GPT-4o, o1, o3-mini, o4, Codex | **50% Read Discount** |
-| **DeepSeek** | DeepSeek-V4-Flash, DeepSeek-V3, DeepSeek-R1 Reasoner | **74% Cache Hit Discount** |
-| **Groq / OpenSource** | Llama 3.3 70B, Llama 3.1 8B, Mixtral 8x7B, Gemma 2 9B | Standard Low-Latency Rates |
-| **Chinese Frontier** | Kimi K3, GLM-5.2 / GLM-4-Plus, Qwen 2.5 72B / Coder | Tiered Regional Pricing |
+| Provider | Supported Models | Official Base Rate (In / Out per 1M) | Cache Discount |
+|---|---|---|---|
+| **Anthropic** | Claude 3.7 / 3.5 Sonnet | $3.00 / $15.00 | **90% Read Discount ($0.30/1M)** |
+| **Anthropic** | Claude 3.5 Haiku | $0.80 / $4.00 | **90% Read Discount ($0.08/1M)** |
+| **Anthropic** | Claude 3 / 4 Opus | $15.00 / $75.00 | **90% Read Discount ($1.50/1M)** |
+| **Google Gemini** | Gemini 3.7 / 2.5 / 2.0 Flash | $0.10 / $0.40 | **75% Cache Discount ($0.025/1M)** |
+| **Google Gemini** | Gemini 2.5 / 3.1 Pro | $1.25 / $5.00 | **75% Cache Discount ($0.31/1M)** |
+| **OpenAI** | GPT-4o | $2.50 / $10.00 | **50% Read Discount ($1.25/1M)** |
+| **OpenAI** | GPT-5.6 Sol (Codex) | $5.00 / $15.00 | **50% Read Discount ($2.50/1M)** |
+| **OpenAI** | o3-mini / o1-mini | $1.10 / $4.40 | **50% Read Discount ($0.55/1M)** |
+| **DeepSeek** | DeepSeek-V4-Flash / V3 | $0.27 / $1.10 | **74% Cache Hit ($0.07/1M)** |
+| **DeepSeek** | DeepSeek-R1 Reasoner | $0.55 / $2.19 | **74% Cache Hit ($0.14/1M)** |
+| **Groq / OpenSource** | Llama 3.3 70B, Mixtral | $0.59 / $0.79 | Standard Low-Latency Rates |
+| **Chinese Frontier** | Kimi K3, GLM-5.2, Qwen 2.5 | Tiered Official Rates | Regional Pricing & Free Flash Tier |
 
 ---
 
