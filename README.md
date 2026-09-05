@@ -136,7 +136,7 @@ Open **`http://localhost:8001/dashboard`** in your browser:
 │  AI 编程软件专属监控矩阵 (4-Tool Cockpit Matrix):                                        │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────────┐ │
 │  │ 🟣 Claude Code   │  │ 🟢 Antigravity   │  │ 🔵 ChatGPT       │  │ 🟡 DeepSeek     │ │
-│  │ Spent: $198.52   │  │ Spent: $165.35   │  │ Spent: $48.93    │  │ Spent: $120.10  │ │
+│  │ Spent: $1986.52  │  │ Spent: $865.35   │  │ Spent: $48.93    │  │ Spent: $120.10  │ │
 │  │ Tokens: 1.84 B   │  │ Tokens: 1.65 B   │  │ Tokens: 7.21 M   │  │ Tokens: 436.9 M │ │
 │  │ Context: 78.1%   │  │ Context: 19.5%   │  │ Context: 76.6%   │  │ Context: 208.2% │ │
 │  │ [Run /compact]   │  │ [Healthy]        │  │ [Open Thread]    │  │ [Clear History] │ │
