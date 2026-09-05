@@ -40,8 +40,8 @@ def get_shared_client() -> httpx.AsyncClient:
     )
 
     if needs_new_client:
-        client_timeout = httpx.Timeout(60.0, connect=10.0, read=300.0, pool=10.0)
-        limits = httpx.Limits(max_connections=200, max_keepalive_connections=50, keepalive_expiry=30.0)
+        client_timeout = httpx.Timeout(timeout=None, connect=15.0, read=None, write=120.0, pool=15.0)
+        limits = httpx.Limits(max_connections=300, max_keepalive_connections=100, keepalive_expiry=60.0)
         _shared_client = httpx.AsyncClient(timeout=client_timeout, limits=limits)
         _client_loop = current_loop
 

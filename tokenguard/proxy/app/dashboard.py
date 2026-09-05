@@ -53,35 +53,6 @@ def _compute_dashboard_sync(store, days: int, selected_project: Optional[str], d
     start_of_day_local = datetime(local_now.year, local_now.month, local_now.day, 0, 0, 0)
     today_start_ts = start_of_day_local.timestamp()
 
-    conn = store._get_conn()
-
-    today_query = """SELECT 
-                       COALESCE(SUM(cost_usd), 0) as spent,
-                       COALESCE(SUM(input_tokens + output_tokens), 0) as tokens,
-                       COALESCE(SUM(input_tokens), 0) as in_tokens,
-                       COALESCE(SUM(output_tokens), 0) as out_tokens,
-                       COUNT(*) as requests,
-                       COALESCE(MAX(context_usage_pct), 0) as max_context_pct
-                     FROM usage_records 
-                     WHERE started_at >= ?"""
-    today_params = [today_start_ts]
-    if selected_project:
-        today_query += " AND project_name = ?"
-        today_params.append(selected_project)
-
-    today_row = conn.execute(today_query, tuple(today_params)).fetchone()
-
-    # Real-time token velocity (TPM over last 5 minutes)
-    five_min_ago = now - 300
-    vel_query = """SELECT COALESCE(SUM(input_tokens + output_tokens), 0) as recent_tokens 
-                   FROM usage_records 
-                   WHERE started_at >= ?"""
-    vel_params = [five_min_ago]
-    if selected_project:
-        vel_query += " AND project_name = ?"
-        vel_params.append(selected_project)
-    vel_row = conn.execute(vel_query, tuple(vel_params)).fetchone()
-
     # Precision 4-Tool Matrix: Claude Code, Antigravity, ChatGPT, DeepSeek
     tool_predicates = {
         "claude_code": "(provider = 'anthropic' AND lower(model_name) NOT LIKE '%deepseek%') OR lower(model_name) LIKE '%claude%' OR lower(model_name) LIKE '%agnes%'",
@@ -98,52 +69,102 @@ def _compute_dashboard_sync(store, days: int, selected_project: Optional[str], d
         "deepseek": {"name": "DeepSeek", "tag": "DeepSeek (V4-Flash / R1)", "provider": "deepseek", "color": "#F59E0B", "optimize_action": "Clear History"},
     }
 
-    for tool_key, pred in tool_predicates.items():
-        base_query = f"SELECT COUNT(*) as requests, COALESCE(SUM(input_tokens + output_tokens), 0) as tokens, COALESCE(SUM(cost_usd), 0) as spent, COALESCE(MAX(context_usage_pct), 0) as max_context_pct FROM usage_records WHERE ({pred})"
-        params = []
-        if days_val:
-            base_query += " AND started_at >= ?"
-            params.append(now - (days_val * 86400))
-        if selected_project:
-            base_query += " AND project_name = ?"
-            params.append(selected_project)
+    today_row = None
+    vel_row = None
+    current_overall_pct = 0.0
 
-        row = conn.execute(base_query, tuple(params)).fetchone()
+    try:
+        conn = store._get_conn()
+        try:
+            today_query = """SELECT 
+                               COALESCE(SUM(cost_usd), 0) as spent,
+                               COALESCE(SUM(input_tokens + output_tokens), 0) as tokens,
+                               COALESCE(SUM(input_tokens), 0) as in_tokens,
+                               COALESCE(SUM(output_tokens), 0) as out_tokens,
+                               COUNT(*) as requests,
+                               COALESCE(MAX(context_usage_pct), 0) as max_context_pct
+                             FROM usage_records 
+                             WHERE started_at >= ?"""
+            today_params = [today_start_ts]
+            if selected_project:
+                today_query += " AND project_name = ?"
+                today_params.append(selected_project)
 
-        # Latest context stress query for this tool
-        l_query = f"SELECT context_usage_pct, model_name FROM usage_records WHERE ({pred})"
-        l_params = []
-        if selected_project:
-            l_query += " AND project_name = ?"
-            l_params.append(selected_project)
-        l_query += " ORDER BY started_at DESC LIMIT 1"
-        l_row = conn.execute(l_query, tuple(l_params)).fetchone()
+            today_row = conn.execute(today_query, tuple(today_params)).fetchone()
 
-        meta = tool_meta[tool_key]
-        tool_matrix[tool_key] = {
-            "name": meta["name"],
-            "provider": meta["provider"],
-            "tag": meta["tag"],
-            "tokens": row["tokens"] if row else 0,
-            "spent": round(row["spent"] if row else 0.0, 4),
-            "requests": row["requests"] if row else 0,
-            "context_stress_pct": round((l_row["context_usage_pct"] or 0.0) * 100, 1) if l_row else 0.0,
-            "peak_context_pct": round((row["max_context_pct"] or 0.0) * 100, 1) if row else 0.0,
-            "color": meta["color"],
-            "optimize_action": meta["optimize_action"],
-        }
+            # Real-time token velocity (TPM over last 5 minutes)
+            five_min_ago = now - 300
+            vel_query = """SELECT COALESCE(SUM(input_tokens + output_tokens), 0) as recent_tokens 
+                           FROM usage_records 
+                           WHERE started_at >= ?"""
+            vel_params = [five_min_ago]
+            if selected_project:
+                vel_query += " AND project_name = ?"
+                vel_params.append(selected_project)
+            vel_row = conn.execute(vel_query, tuple(vel_params)).fetchone()
 
-    latest_overall_query = """SELECT context_usage_pct FROM usage_records"""
-    latest_overall_params = []
-    if selected_project:
-        latest_overall_query += " WHERE project_name = ?"
-        latest_overall_params.append(selected_project)
-    latest_overall_query += " ORDER BY started_at DESC LIMIT 1"
+            for tool_key, pred in tool_predicates.items():
+                base_query = f"SELECT COUNT(*) as requests, COALESCE(SUM(input_tokens + output_tokens), 0) as tokens, COALESCE(SUM(cost_usd), 0) as spent, COALESCE(MAX(context_usage_pct), 0) as max_context_pct FROM usage_records WHERE ({pred})"
+                params = []
+                if days_val:
+                    base_query += " AND started_at >= ?"
+                    params.append(now - (days_val * 86400))
+                if selected_project:
+                    base_query += " AND project_name = ?"
+                    params.append(selected_project)
 
-    latest_overall_row = conn.execute(latest_overall_query, tuple(latest_overall_params)).fetchone()
-    current_overall_pct = round(latest_overall_row["context_usage_pct"] or 0.0, 4) if latest_overall_row else 0.0
+                row = conn.execute(base_query, tuple(params)).fetchone()
 
-    conn.close()
+                # Latest context stress query for this tool
+                l_query = f"SELECT context_usage_pct, model_name FROM usage_records WHERE ({pred})"
+                l_params = []
+                if selected_project:
+                    l_query += " AND project_name = ?"
+                    l_params.append(selected_project)
+                l_query += " ORDER BY started_at DESC LIMIT 1"
+                l_row = conn.execute(l_query, tuple(l_params)).fetchone()
+
+                meta = tool_meta[tool_key]
+                tool_matrix[tool_key] = {
+                    "name": meta["name"],
+                    "provider": meta["provider"],
+                    "tag": meta["tag"],
+                    "tokens": row["tokens"] if row else 0,
+                    "spent": round(row["spent"] if row else 0.0, 4),
+                    "requests": row["requests"] if row else 0,
+                    "context_stress_pct": round((l_row["context_usage_pct"] or 0.0) * 100, 1) if l_row else 0.0,
+                    "peak_context_pct": round((row["max_context_pct"] or 0.0) * 100, 1) if row else 0.0,
+                    "color": meta["color"],
+                    "optimize_action": meta["optimize_action"],
+                }
+
+            latest_overall_query = """SELECT context_usage_pct FROM usage_records"""
+            latest_overall_params = []
+            if selected_project:
+                latest_overall_query += " WHERE project_name = ?"
+                latest_overall_params.append(selected_project)
+            latest_overall_query += " ORDER BY started_at DESC LIMIT 1"
+
+            latest_overall_row = conn.execute(latest_overall_query, tuple(latest_overall_params)).fetchone()
+            current_overall_pct = round(latest_overall_row["context_usage_pct"] or 0.0, 4) if latest_overall_row else 0.0
+        finally:
+            conn.close()
+    except Exception as db_err:
+        logger.warning("Database query notice in dashboard sync: %s", db_err)
+        for tool_key, meta in tool_meta.items():
+            if tool_key not in tool_matrix:
+                tool_matrix[tool_key] = {
+                    "name": meta["name"],
+                    "provider": meta["provider"],
+                    "tag": meta["tag"],
+                    "tokens": 0,
+                    "spent": 0.0,
+                    "requests": 0,
+                    "context_stress_pct": 0.0,
+                    "peak_context_pct": 0.0,
+                    "color": meta["color"],
+                    "optimize_action": meta["optimize_action"],
+                }
 
     recent_tokens = vel_row["recent_tokens"] if vel_row else 0
     tpm = int(recent_tokens / 5) if recent_tokens else 0

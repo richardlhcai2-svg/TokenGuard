@@ -140,7 +140,7 @@ async def handle(
 
     created_client = False
     if client is None:
-        client_timeout = httpx.Timeout(60.0, connect=10.0, read=300.0, pool=5.0)
+        client_timeout = httpx.Timeout(timeout=None, connect=15.0, read=None, write=120.0, pool=15.0)
         client = httpx.AsyncClient(timeout=client_timeout)
         created_client = True
 
@@ -177,8 +177,9 @@ async def handle(
         return JSONResponse(
             status_code=502,
             content={
+                "type": "error",
                 "error": {
-                    "type": "upstream_error",
+                    "type": "api_error",
                     "message": f"TokenGuard unable to connect to upstream ({upstream_base}): {exc}. If using fcc-server or OmniRoute, please ensure the upstream proxy is running.",
                 }
             },
@@ -259,6 +260,8 @@ def _handle_streaming_sniffer(
                                     output_tokens = usage.get("completion_tokens", output_tokens)
                 except Exception:
                     pass
+        except (httpx.HTTPError, asyncio.CancelledError, Exception) as stream_err:
+            logger.warning("Anthropic stream iterator closed or interrupted: %s", stream_err)
         finally:
             await response.aclose()
             if client_to_close is not None:
